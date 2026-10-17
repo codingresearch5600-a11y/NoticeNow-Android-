@@ -2,9 +2,9 @@
 name: Build NoticeNow Android APK
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,34 +12,44 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: "17"
+          distribution: temurin
 
-      - name: Extract Android project
+      - name: Check project files
         run: |
-          unzip -o ChangeRadarAndroid-GitHub-ready.zip
-          cd ChangeRadarAndroid
-          sed -i 's/android:label="ChangeRadar"/android:label="NoticeNow"/' app/src/main/AndroidManifest.xml
+          ls -la
+          find . -maxdepth 3 -type f | head -100
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
+      - name: Extract project ZIP if present
+        run: |
+          if [ -f "ChangeRadarAndroid-GitHub-ready.zip" ]; then
+            unzip -o "ChangeRadarAndroid-GitHub-ready.zip" -d extracted
+          else
+            echo "Project ZIP not found in repository root."
+            exit 1
+          fi
 
-      - name: Build APK
-        working-directory: ChangeRadarAndroid
-        run: gradle assembleDebug --no-daemon
+      - name: Locate Gradle project
+        run: |
+          find extracted -name gradlew -type f
+          find extracted -name settings.gradle.kts -o -name settings.gradle
+
+      - name: Build Android APK
+        run: |
+          cd extracted/ChangeRadarAndroid
+          gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NoticeNow-debug-apk
-          path: ChangeRadarAndroid/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          path: extracted/ChangeRadarAndroid/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
